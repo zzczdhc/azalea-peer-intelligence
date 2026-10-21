@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Azalea company filings workspace: collect, inspect, and trace public SEC annual and quarterly reports.">
+  <title>Azalea — Company filings</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#workspace">Skip to workspace</a>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Workspace navigation">
+      <a class="brand" href="/" aria-label="Azalea home"><span class="brand-mark">a</span>Azalea</a>
+      <div class="sidebar-label">COMPANY INTELLIGENCE</div>
+      <a class="nav-item" href="#workspace" aria-current="page"><span class="nav-dot"></span>Company filings</a>
+      <div class="sidebar-bottom"><div class="sidebar-label">DATA SOURCE</div><strong>SEC EDGAR</strong><p>Annual and quarterly<br>primary documents</p><a href="https://www.sec.gov/edgar/search/" target="_blank" rel="noopener noreferrer">Explore EDGAR ↗</a></div>
+    </aside>
+    <div class="workspace-shell">
+      <header class="topbar"><span>Research workspace <span class="breadcrumb">/ Company filings</span></span><span class="source-label"><span></span>Public SEC data</span></header>
+      <main id="workspace">
+        <div class="page-heading"><div><div class="eyebrow">RESEARCH STARTS WITH THE SOURCE</div><h1>Company filings</h1><p>Collect and inspect the reports behind your company research.</p></div><span class="workspace-tag">Azalea · NYU CDS</span></div>
+        <section class="collection-panel" aria-labelledby="collection-heading">
+          <div class="section-heading"><h2 id="collection-heading">Collect filings</h2><span class="secondary small">Latest reports within your selected dates</span></div>
+          <form id="collection-form">
+            <div class="search-row"><label class="ticker-field" for="ticker"><span class="field-label">Ticker or CIK</span><input id="ticker" name="ticker" value="SPGI" placeholder="e.g. SPGI, MCO, MSFT" maxlength="12" required spellcheck="false" autocomplete="off"></label><button id="collect-button" class="button primary" type="submit">Collect filings <span aria-hidden="true">→</span></button></div>
+            <details class="settings"><summary>Collection settings</summary><div class="settings-grid"><label>Filed from<input id="since" name="since" type="date" required></label><label>Filed through<input id="until" name="until" type="date" required></label><label>Reports per form<select id="max-per-form" name="max_per_form"><option value="1">Latest 1</option><option value="2">Latest 2</option><option value="3">Latest 3</option></select></label><fieldset><legend>Report types</legend><label class="check-label"><input type="checkbox" name="form" value="10-K" checked>10-K annual</label><label class="check-label"><input type="checkbox" name="form" value="10-Q" checked>10-Q quarterly</label></fieldset></div><label class="check-label refresh-label"><input id="refresh-documents" type="checkbox">Check existing reports for source changes</label></details>
+          </form>
+          <div class="collection-status" id="collection-status" aria-live="polite"><span class="status-dot"></span><span id="status-message">Loading workspace…</span><progress id="collection-progress" aria-label="Collection in progress" hidden></progress></div>
+          <div id="collection-error" class="error-message" role="alert" hidden></div>
+        </section>
+
+        <section class="library-section" aria-labelledby="library-heading">
+          <div class="section-heading library-title"><div><h2 id="library-heading">Saved filings <span id="filing-count" class="count">0</span></h2><p class="secondary small" id="library-caption">Reports saved in this workspace.</p></div><div class="library-controls"><label id="company-filter-label" hidden><span class="sr-only">Filter by company</span><select id="company-filter" aria-label="Filter by company"></select></label><button class="button quiet" id="refresh-library" type="button">Refresh library</button></div></div>
+          <div class="company-strip" id="company-strip" hidden><span class="company-symbol" id="company-symbol"></span><div><h3 id="company-name"></h3><p id="company-details" class="secondary small"></p></div><span class="company-identifier small" id="company-cik"></span></div>
+          <div class="empty-state" id="empty-state" hidden><span class="empty-icon" aria-hidden="true">↗</span><h3>Your research library starts here</h3><p>Enter a company ticker above to collect its latest annual and quarterly reports.</p></div>
+          <div class="table-wrap" id="filings-table-wrap" hidden><table class="filings-table"><thead><tr><th scope="col">Report</th><th scope="col">Filed</th><th scope="col">Period ended</th><th scope="col">Status</th><th scope="col">Document</th></tr></thead><tbody id="filings-body"></tbody></table></div>
+        </section>
+
+        <section class="competitor-section" id="competitor-section" aria-labelledby="competitor-heading" hidden>
+          <div class="section-heading"><div><div class="eyebrow">FROM DISCLOSURE TO DISCOVERY</div><h2 id="competitor-heading">Disclosed competitors <span id="competitor-count" class="count"></span></h2></div><span class="disclosure-badge">Company-disclosed candidates</span></div>
+          <p id="competitor-source" class="competitor-source secondary small"></p>
+          <p id="competitor-status" class="secondary" role="status" aria-live="polite">Reading competition statements…</p>
+          <div id="competitor-results" hidden>
+            <div class="competitor-metrics"><div><strong id="competitor-total">0</strong><span>Named candidates</span></div><div><strong id="competitor-contexts">0</strong><span>Business contexts</span></div><div><strong id="competitor-matched">0</strong><span>SEC directory matches</span></div></div>
+            <div class="competitor-controls"><label for="competitor-filter"><span class="field-label">Explore by business context</span><select id="competitor-filter"></select></label><span class="secondary small">A company can appear in several contexts.</span></div>
+            <div id="competitor-cards" class="competitor-cards"></div>
+            <div class="competitor-list-footer"><span id="competitor-visible" class="secondary small"></span><button id="competitor-show-all" type="button" class="button quiet" hidden>Show all</button></div>
+            <div id="competitor-evidence" class="competitor-evidence" hidden>
+              <div class="section-heading"><div><div class="eyebrow">WHY THIS COMPANY APPEARS</div><h3 id="evidence-heading"></h3></div><span class="evidence-tag">Explicit name in source</span></div>
+              <p id="evidence-basis" class="evidence-basis secondary small"></p>
+              <blockquote id="evidence-relation" hidden></blockquote>
+              <div id="evidence-contexts" class="evidence-contexts" role="group" aria-label="Evidence contexts"></div>
+              <blockquote id="evidence-quote"></blockquote>
+              <p id="evidence-identity" class="secondary small"></p>
+              <div class="evidence-actions"><button id="evidence-open" class="button quiet" type="button">Show in report ↓</button><a id="evidence-source" class="button quiet" target="_blank" rel="noopener noreferrer">SEC original ↗</a></div>
+            </div>
+            <details class="extraction-note"><summary>How to read these results</summary><p>A name needs a direct competition statement or a business list explicitly introduced as a source of competition. A Competition heading alone is insufficient. The extractor keeps the statement and its introduction so you can verify the relation.</p><p>SEC directory matches check company-name spelling. They do not verify the competitive relationship. Brands, subsidiaries, historical names and ambiguous identities need review. An unmatched name does not establish listing status.</p><p>These rules support selected disclosure formats. This is a candidate set for review; coverage, business similarity and financial comparability still need evaluation.</p></details>
+          </div>
+          <div id="competitor-empty" class="competitor-empty" hidden><h3>No named competitors extracted</h3><p id="competitor-empty-message"></p><button id="competitor-open-annual" class="button quiet" type="button" hidden>Open latest saved 10-K →</button></div>
+          <p class="competitor-note">Disclosure-based candidates · Names and relationships reflect the filing date · No similarity ranking yet</p>
+        </section>
+
+        <section class="reader-section" id="reader-section" aria-labelledby="reader-heading" hidden>
+          <div class="section-heading"><div><div class="eyebrow">DOCUMENT REVIEW</div><h2 id="reader-heading">Cleaned text</h2></div><div class="reader-actions"><a id="reader-source" class="button quiet" target="_blank" rel="noopener noreferrer">SEC original ↗</a><a id="reader-download" class="button quiet">Download text ↓</a><a id="reader-metadata" class="button quiet">Metadata ↓</a></div></div>
+          <div class="reader-meta" id="reader-meta"></div>
+          <p class="reader-note">Basic HTML extraction. Use the SEC original to verify tables, formatting, and context.</p>
+          <div class="reader-tools" role="group" aria-label="Find in report">
+            <label class="reader-search-field" for="reader-search"><span class="field-label">Find in full report</span><input id="reader-search" type="search" placeholder="e.g. Competition, SpaceX" maxlength="100" autocomplete="off" spellcheck="false" disabled></label>
+            <div class="reader-find-actions"><button id="reader-previous" class="button quiet" type="button" aria-label="Previous match" disabled>Previous</button><button id="reader-next" class="button quiet" type="button" aria-label="Next match" disabled>Next</button><button id="reader-competition" class="button quiet" type="button" hidden>Jump to Competition</button></div>
+            <span id="reader-find-count" class="secondary small" role="status" aria-live="polite">Loading report…</span>
+          </div>
+          <div class="reader-error error-message" id="reader-error" role="alert" hidden></div>
+          <pre id="reader-text" class="reader-text" aria-label="Extracted report text" tabindex="0"></pre>
+          <div class="reader-footer" id="reader-footer"></div>
+        </section>
+        <footer class="page-footer"><span>Source-linked documents. Company-level records.</span><span id="last-run-label">No collection yet</span></footer>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

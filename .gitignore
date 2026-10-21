@@ -218,3 +218,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local data and generated baseline outputs
+/data/
+/outputs/
+
+# Local configuration, generated previews and platform files
+.env*
+.DS_Store
+/sites/

@@ -1,0 +1,48 @@
+{
+  "data_kind": "synthetic_fixture",
+  "all_financial_text_and_accessions_are_invented": true,
+  "company_identities": "Real ticker/CIK pairs; everything else is a test example",
+  "warning": "These are NOT downloaded SEC responses. Do not use for company analysis.",
+  "files": [
+    {
+      "filename": "company_tickers.json",
+      "mock_url": "https://www.sec.gov/files/company_tickers.json"
+    },
+    {
+      "filename": "CIK0000064040.json",
+      "mock_url": "https://data.sec.gov/submissions/CIK0000064040.json"
+    },
+    {
+      "filename": "spgi-SYNTHETIC-annual-1.htm",
+      "mock_url": "https://www.sec.gov/Archives/edgar/data/64040/000006404026900001/spgi-SYNTHETIC-annual-1.htm"
+    },
+    {
+      "filename": "spgi-SYNTHETIC-quarterly-2.htm",
+      "mock_url": "https://www.sec.gov/Archives/edgar/data/64040/000006404026900002/spgi-SYNTHETIC-quarterly-2.htm"
+    },
+    {
+      "filename": "CIK0001059556.json",
+      "mock_url": "https://data.sec.gov/submissions/CIK0001059556.json"
+    },
+    {
+      "filename": "mco-SYNTHETIC-annual-1.htm",
+      "mock_url": "https://www.sec.gov/Archives/edgar/data/1059556/000105955626900001/mco-SYNTHETIC-annual-1.htm"
+    },
+    {
+      "filename": "mco-SYNTHETIC-quarterly-2.htm",
+      "mock_url": "https://www.sec.gov/Archives/edgar/data/1059556/000105955626900002/mco-SYNTHETIC-quarterly-2.htm"
+    },
+    {
+      "filename": "CIK0000789019.json",
+      "mock_url": "https://data.sec.gov/submissions/CIK0000789019.json"
+    },
+    {
+      "filename": "msft-SYNTHETIC-annual-1.htm",
+      "mock_url": "https://www.sec.gov/Archives/edgar/data/789019/000078901926900001/msft-SYNTHETIC-annual-1.htm"
+    },
+    {
+      "filename": "msft-SYNTHETIC-quarterly-2.htm",
+      "mock_url": "https://www.sec.gov/Archives/edgar/data/789019/000078901926900002/msft-SYNTHETIC-quarterly-2.htm"
+    }
+  ]
+}
