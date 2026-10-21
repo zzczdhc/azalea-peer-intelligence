@@ -30,7 +30,23 @@ def cosine(a,b):
     return max(0.0,min(1.0,sum(value*b.get(term,0.0) for term,value in a.items())))
 
 
-def build_text(source,data,year=2023):
+class TextArchive:
+    def __init__(self,source):self.source=source;self.zip=None
+    def __enter__(self):
+        if not self.source.is_dir():self.zip=zipfile.ZipFile(self.source)
+        return self
+    def __exit__(self,*args):
+        if self.zip:self.zip.close()
+    def namelist(self):
+        return self.zip.namelist() if self.zip else [str(p.relative_to(self.source)) for p in self.source.rglob('*.txt')]
+    def read(self,name):return self.zip.read(name) if self.zip else (self.source/name).read_bytes()
+
+
+def build_text(source,data,year=2023,section="business"):
+    if section not in ("business","risk","mda"):raise ValueError("Invalid section")
+    vectors="text_vectors" if section=="business" else section+"_vectors"
+    terms="text_terms" if section=="business" else section+"_terms"
+    audit="text" if section=="business" else section
     source,data=Path(source),Path(data)
     with sqlite3.connect(data/'tnic.sqlite') as db:
         rows=db.execute('''WITH dated AS (
@@ -42,7 +58,7 @@ def build_text(source,data,year=2023):
         JOIN dated x ON CAST(i.cik AS INTEGER)=x.cik AND x.rn=1''',
         (f'{year}-01-01',f'{year}-12-31',year)).fetchall()
         corpus,df,skipped={},Counter(),Counter()
-        with zipfile.ZipFile(source) as archive:
+        with TextArchive(source) as archive:
             entries={Path(n).stem:n for n in archive.namelist() if n.endswith('.txt')}
             for gvkey,adsh,filed in rows:
                 entry=entries.get(adsh)
@@ -56,32 +72,37 @@ def build_text(source,data,year=2023):
         n=len(corpus)
         if n<3:raise ValueError('Not enough matched annual business descriptions')
         vocabulary={term:i for i,term in enumerate(sorted(t for t,f in df.items() if 2 <= f <= .8*n))}
-        db.executescript('''CREATE TABLE IF NOT EXISTS text_vectors(
+        db.executescript(f'''CREATE TABLE IF NOT EXISTS {vectors}(
             year INTEGER,gvkey INTEGER,vector TEXT,adsh TEXT,filed TEXT,characters INTEGER,
             PRIMARY KEY(year,gvkey));
-            CREATE TABLE IF NOT EXISTS text_terms(year INTEGER,term_id INTEGER,term TEXT,
+            CREATE TABLE IF NOT EXISTS {terms}(year INTEGER,term_id INTEGER,term TEXT,
             PRIMARY KEY(year,term_id));''')
-        db.execute('DELETE FROM text_vectors WHERE year=?',(year,));db.execute('DELETE FROM text_terms WHERE year=?',(year,))
-        db.executemany('INSERT INTO text_terms VALUES (?,?,?)',[(year,i,t) for t,i in vocabulary.items()])
+        db.execute(f'DELETE FROM {vectors} WHERE year=?',(year,));db.execute(f'DELETE FROM {terms} WHERE year=?',(year,))
+        db.executemany(f'INSERT INTO {terms} VALUES (?,?,?)',[(year,i,t) for t,i in vocabulary.items()])
         for gvkey,(words,adsh,filed,chars) in corpus.items():
             vec=tfidf(words,df,n)
             values={str(vocabulary[t]):round(v,10) for t,v in vec.items()}
             if not values:skipped['empty_vector']+=1;continue
-            db.execute('INSERT INTO text_vectors VALUES (?,?,?,?,?,?)',(year,gvkey,json.dumps(values,separators=(',',':')),adsh,filed,chars))
-        vector_count=db.execute('SELECT count(*) FROM text_vectors WHERE year=?',(year,)).fetchone()[0]
+            db.execute(f'INSERT INTO {vectors} VALUES (?,?,?,?,?,?)',(year,gvkey,json.dumps(values,separators=(',',':')),adsh,filed,chars))
+        vector_count=db.execute(f'SELECT count(*) FROM {vectors} WHERE year=?',(year,)).fetchone()[0]
     digest=hashlib.sha256()
-    with source.open('rb') as f:
-        for chunk in iter(lambda:f.read(1024*1024),b''):digest.update(chunk)
+    if source.is_dir():
+        for g in sorted(corpus):
+            digest.update(str(g).encode());digest.update(corpus[g][1].encode())
+            digest.update((source/entries[corpus[g][1]]).read_bytes())
+    else:
+        with source.open('rb') as f:
+            for chunk in iter(lambda:f.read(1024*1024),b''):digest.update(chunk)
     report=dict(year=year,status='descriptive_only_not_predictive_backtest',
                 source=str(source.resolve()),sha256=digest.hexdigest(),candidate_filings=len(rows),
                 documents=vector_count,vocabulary=len(vocabulary),skipped=dict(skipped),
-                section='10-K Item 1 Business',filing_rule='latest non-amended 10-K filed within selected calendar year, exact accession match',
+                section={'business':'10-K Item 1 Business','risk':'10-K Item 1A Risk Factors','mda':'10-K Item 7 MD&A'}[section],filing_rule='latest non-amended 10-K filed within selected calendar year, exact accession match',
                 formula='sublinear TF (1+ln count) × smoothed IDF (ln((1+N)/(1+df))+1), L2 normalization, cosine dot product',
                 min_document_characters=500,min_remaining_tokens=100,min_df=2,max_df=.8,
                 tokenizer='lowercase ASCII letter unigrams length 3–40; explicit English/filing stop list',
                 stop_words=sorted(STOP),
                 caveat='Independent lexical diagnostic; not a TNIC replication or a product-fit outcome test. Static identifiers are display-only. IDF fitted on the eligible descriptive-year corpus, not a train/test experiment.')
-    (data/f'text_audit_{year}.json').write_text(json.dumps(report,indent=2)+'\n')
+    (data/f'{audit}_audit_{year}.json').write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps({k:report[k] for k in ['year','documents','vocabulary','skipped']}),flush=True)
     return report
 
@@ -118,14 +139,16 @@ if __name__=='__main__':
     a=p.parse_args();build_text(a.source,a.data,a.year)
 
 
-def text_neighbours(db,year,gvkey,k=10):
+def text_neighbours(db,year,gvkey,k=10,section="business"):
+    if section not in ("business","risk","mda"):raise ValueError("Invalid section")
+    table="text_vectors" if section=="business" else section+"_vectors"
     """Top-k over the complete eligible text corpus, never restricted to SIC."""
-    if not db.execute("SELECT 1 FROM sqlite_master WHERE name='text_vectors'").fetchone():
+    if not db.execute("SELECT 1 FROM sqlite_master WHERE name=?",(table,)).fetchone():
         return dict(available=False,reason='TF-IDF vectors have not been built.')
-    focal=db.execute('SELECT vector,adsh,filed FROM text_vectors WHERE year=? AND gvkey=?',(year,gvkey)).fetchone()
-    if not focal:return dict(available=False,reason='No matched annual Business text for this company and year.')
+    focal=db.execute(f'SELECT vector,adsh,filed FROM {table} WHERE year=? AND gvkey=?',(year,gvkey)).fetchone()
+    if not focal:return dict(available=False,reason=f'No matched annual {section} text for this company and year.')
     vector=json.loads(focal[0]);scores=[]
-    for peer,value,adsh,filed in db.execute('SELECT gvkey,vector,adsh,filed FROM text_vectors WHERE year=? AND gvkey<>?',(year,gvkey)):
+    for peer,value,adsh,filed in db.execute(f'SELECT gvkey,vector,adsh,filed FROM {table} WHERE year=? AND gvkey<>?',(year,gvkey)):
         scores.append((cosine(vector,json.loads(value)),peer,adsh,filed))
     scores.sort(key=lambda r:(-r[0],r[1]));peers=[]
     for rank,(score,peer,adsh,filed) in enumerate(scores[:k],1):

@@ -1,14 +1,16 @@
 """Exact membership partitions for two to four selected peer methods."""
 if __package__:
+    from .fusion import fusion_result
     from .sic import sic_peers
     from .fundamentals import financial_peers
     from .text_similarity import text_neighbours
 else:
+    from fusion import fusion_result
     from sic import sic_peers
     from fundamentals import financial_peers
     from text_similarity import text_neighbours
 
-LABELS={'tnic':'TNIC','sic':'SIC','financial':'Financial','tfidf':'TF-IDF'}
+LABELS={'tnic':'TNIC','sic':'SIC','financial':'Financial','tfidf':'Business TF-IDF','risk':'Risk TF-IDF','mda':'MD&A TF-IDF','fusion':'Fusion'}
 
 
 def partition_sets(sets):
@@ -23,7 +25,7 @@ def partition_sets(sets):
     return regions
 
 
-def overlap_result(db,year,gvkey,digits,methods,text_result=None):
+def overlap_result(db,year,gvkey,digits,methods,text_result=None,weights=None):
     if len(methods)!=len(set(methods)) or not 2<=len(methods)<=4 or any(m not in LABELS for m in methods):
         raise ValueError('Choose two to four distinct available methods')
     sets={};notes=[]
@@ -40,6 +42,12 @@ def overlap_result(db,year,gvkey,digits,methods,text_result=None):
             elif method=='financial':
                 result=financial_peers(db,year,gvkey)
                 notes.append('Financial: top 10 from complete five-feature financial profiles.')
+            elif method=='fusion':
+                result=fusion_result(db,year,gvkey,weights or dict(business=25,risk=25,mda=25,financial=25))
+                if result['available']:notes.append('Fusion weights: '+', '.join(f'{k} {v*100:.1f}%' for k,v in result['weights'].items())+'.')
+            elif method in ('risk','mda'):
+                result=text_neighbours(db,year,gvkey,section=method)
+                notes.append(LABELS[method]+': independent section-specific top 10.')
             else:
                 result=text_result if text_result is not None else text_neighbours(db,year,gvkey)
                 notes.append('TF-IDF: top 10 from the full eligible Business-text corpus, not only SIC peers.')
@@ -55,4 +63,5 @@ def overlap_result(db,year,gvkey,digits,methods,text_result=None):
     return dict(available=True,year=year,gvkey=gvkey,digits=digits,
        sets=[dict(id=m,label=LABELS[m]+(f' {digits}-digit' if m=='sic' else ''),count=len(ids)) for m,ids in sets.items()],
        intersection_count=len(all_shared),intersection=[company(g) for g in sorted(all_shared)],
-       union_count=len(set.union(*sets.values())),regions=regions,notes=notes)
+       union_count=len(set.union(*sets.values())),regions=regions,notes=notes,
+       fusion_weights=(weights or dict(business=25,risk=25,mda=25,financial=25)) if 'fusion' in methods else None)

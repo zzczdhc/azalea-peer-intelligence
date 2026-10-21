@@ -8,12 +8,16 @@ import sqlite3
 from urllib.parse import urlparse, parse_qs
 
 if __package__:
+    from .fusion import fusion_result
+    from .text_jobs import status as text_status
     from .year_jobs import status as year_status
     from .sic import sic_peers
     from .text_similarity import score_peers, text_neighbours
     from .fundamentals import financial_peers
     from .overlap import overlap_result
 else:
+    from fusion import fusion_result
+    from text_jobs import status as text_status
     from year_jobs import status as year_status
     from sic import sic_peers
     from text_similarity import score_peers, text_neighbours
@@ -46,22 +50,22 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         url=urlparse(self.path)
-        if url.path!='/api/financial/prepare':return self.respond(404,b'{}')
+        if url.path not in ('/api/financial/prepare','/api/tfidf/prepare'):return self.respond(404,b'{}')
         # Only the local application may trigger downloads and database writes.
         origin=self.headers.get('Origin')
         if self.headers.get('Sec-Fetch-Site')=='cross-site' or (origin and origin!=f'http://{self.headers.get("Host")}'):
             return self.respond(403,b'{}')
         try:
             year=int(parse_qs(url.query)['year'][0])
-            return self.respond(200,json.dumps(year_status(self.data,year,start=True)).encode())
+            return self.respond(200,json.dumps((text_status if url.path=='/api/tfidf/prepare' else year_status)(self.data,year,start=True,**({'section':parse_qs(url.query).get('section',['business'])[0]} if url.path=='/api/tfidf/prepare' else {}))).encode())
         except (ValueError,KeyError,IndexError):return self.respond(400,b'{}')
 
     def do_GET(self):
         url = urlparse(self.path)
         if url.path == '/':
             return self.respond(200, (Path(__file__).with_name('explorer.html')).read_bytes(), 'text/html; charset=utf-8')
-        if url.path == '/api/financial/status':
-            try:return self.respond(200,json.dumps(year_status(self.data,int(parse_qs(url.query)['year'][0]))).encode())
+        if url.path in ('/api/financial/status','/api/tfidf/status'):
+            try:return self.respond(200,json.dumps((text_status if url.path=='/api/tfidf/status' else year_status)(self.data,int(parse_qs(url.query)['year'][0]),**({'section':parse_qs(url.query).get('section',['business'])[0]} if url.path=='/api/tfidf/status' else {}))).encode())
             except (ValueError,KeyError,IndexError):return self.respond(400,b'{}')
         if url.path == '/api/audit':
             audit=json.loads((self.data/'audit.json').read_text())
@@ -70,17 +74,26 @@ class Handler(BaseHTTPRequestHandler):
             sic=self.data/'sic_audit.json'
             audit['sic']=json.loads(sic.read_text()) if sic.exists() else None
             return self.respond(200,json.dumps(audit).encode())
+        if url.path=='/api/fusion':
+            try:
+                q=parse_qs(url.query);weights={key:float(q.get(key,['25'])[0]) for key in ('business','risk','mda','financial')}
+                with sqlite3.connect(self.data/'tnic.sqlite') as db:result=fusion_result(db,int(q['year'][0]),int(q['gvkey'][0]),weights)
+                return self.respond(200,json.dumps(result).encode())
+            except (ValueError,KeyError):return self.respond(400,b'{"error":"Invalid fusion settings"}')
         if url.path in ('/api/financial','/api/tfidf','/api/overlap'):
             try:
                 q=parse_qs(url.query);year=int(q.get('year',['2023'])[0]);gvkey=int(q.get('gvkey',['7343'])[0])
                 path=self.data/'tnic.sqlite'
                 if url.path=='/api/tfidf':
-                    result=cached_text_neighbours(str(path.resolve()),path.stat().st_mtime_ns,year,gvkey)
+                    section=q.get('section',['business'])[0]
+                    if section=='business':result=cached_text_neighbours(str(path.resolve()),path.stat().st_mtime_ns,year,gvkey)
+                    else:
+                        with sqlite3.connect(path) as db:result=text_neighbours(db,year,gvkey,section=section)
                 else:
                     methods=q.get('methods',['tnic,sic'])[0].split(',')
                     text=cached_text_neighbours(str(path.resolve()),path.stat().st_mtime_ns,year,gvkey) if url.path=='/api/overlap' and 'tfidf' in methods else None
                     with sqlite3.connect(path) as db:
-                        result=financial_peers(db,year,gvkey) if url.path=='/api/financial' else overlap_result(db,year,gvkey,int(q.get('digits',['3'])[0]),methods,text)
+                        result=financial_peers(db,year,gvkey) if url.path=='/api/financial' else overlap_result(db,year,gvkey,int(q.get('digits',['3'])[0]),methods,text,{key:float(q.get(key,['25'])[0]) for key in ('business','risk','mda','financial')})
                 return self.respond(200,json.dumps(result).encode())
             except (ValueError,IndexError):
                 return self.respond(400,b'{"error":"Invalid year, GVKEY, grouping or method selection"}')
